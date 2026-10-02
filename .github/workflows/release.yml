@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node build.mjs
+      - name: Check tag matches manifest version
+        run: |
+          v=$(node -p "require('./static/manifest.json').version")
+          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match manifest version $v"; exit 1; }
+      - name: Package extension
+        run: cd dist && zip -qr ../sheetdown.xpi .
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Firefox extension that makes Pokemon Showdown look like a spreadsheet, with a built-in damage calculator.
+
+          **Install:** download `sheetdown.xpi` below, then in Firefox open `about:debugging` → This Firefox → Load Temporary Add-on and pick the file.
+
+          **Shortcuts:** Alt+Shift+S toggles spreadsheet mode. Alt+Shift+Q switches to a decoy sheet.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" sheetdown.xpi --title "Sheetdown $GITHUB_REF_NAME" --notes-file notes.md --generate-notes
