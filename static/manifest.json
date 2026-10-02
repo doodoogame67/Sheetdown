@@ -1,0 +1,48 @@
+{
+  "manifest_version": 2,
+  "name": "Sheetdown",
+  "version": "1.5.0",
+  "description": "Plays Pokemon Showdown through a spreadsheet-style interface, with a built-in damage calculator.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "sheetdown@local",
+      "strict_min_version": "109.0",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  },
+  "permissions": [
+    "storage",
+    "https://pkmn.github.io/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://play.pokemonshowdown.com/*",
+        "*://*.psim.us/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "sheet.css"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    "page.js"
+  ],
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg"
+  }
+}
