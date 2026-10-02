@@ -1,8 +1,11 @@
 name: Release
 
+# Publishes a release whenever main has a manifest version with no release yet.
+# To ship a new version: bump "version" in static/manifest.json and push.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,21 +15,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Read version and check for an existing release
+        id: ver
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(node -p "require('./static/manifest.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists, nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.ver.outputs.skip != 'true'
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: node build.mjs
-      - name: Check tag matches manifest version
-        run: |
-          v=$(node -p "require('./static/manifest.json').version")
-          [ "v$v" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME does not match manifest version $v"; exit 1; }
+      - if: steps.ver.outputs.skip != 'true'
+        run: npm ci
+      - if: steps.ver.outputs.skip != 'true'
+        run: node build.mjs
       - name: Package extension
+        if: steps.ver.outputs.skip != 'true'
         run: cd dist && zip -qr ../sheetdown.xpi .
       - name: Publish release
+        if: steps.ver.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
         run: |
           cat > notes.md <<'NOTES'
           Firefox extension that makes Pokemon Showdown look like a spreadsheet, with a built-in damage calculator.
@@ -35,4 +51,4 @@ jobs:
 
           **Shortcuts:** Alt+Shift+S toggles spreadsheet mode. Alt+Shift+Q switches to a decoy sheet.
           NOTES
-          gh release create "$GITHUB_REF_NAME" sheetdown.xpi --title "Sheetdown $GITHUB_REF_NAME" --notes-file notes.md --generate-notes
+          gh release create "$TAG" sheetdown.xpi --target "$GITHUB_SHA" --title "Sheetdown $TAG" --notes-file notes.md
